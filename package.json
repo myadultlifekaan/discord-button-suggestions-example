@@ -1,0 +1,17 @@
+{
+  "dependencies": {
+    "discord.js": "^13.1.0",
+    "dotenv": "^10.0.0",
+    "quick.db": "^7.1.3"
+  },
+  "name": "discord-button-suggestions-example",
+  "description": "> **Note:** This is only a proof of concept, no optimizations to the code have been made, this is only to show how the feature might look as an end product.",
+  "version": "1.0.0",
+  "main": "index.js",
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC"
+}
