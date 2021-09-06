@@ -118,7 +118,7 @@ client.on('messageCreate', async message => {
     ]);
 
     // Send staff message
-    const feedback = await message.guild.channels.cache
+    message.guild.channels.cache
         .get(SUGGESTIONS_CHANNEL_ID)
         .send({ embeds: [embed], components: [row] });
 
