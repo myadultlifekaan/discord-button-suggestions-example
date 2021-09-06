@@ -98,4 +98,4 @@ typings/
 
 .fusebox/
 
-\*.sqlite
+*.sqlite
