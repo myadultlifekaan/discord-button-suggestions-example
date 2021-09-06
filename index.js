@@ -1,8 +1,7 @@
 require('dotenv').config();
 
 // Configuration
-const SUGGEST_CHANNEL_ID = '884156951200673808'; // Users send suggestions in this channel
-const SUGGESTIONS_CHANNEL_ID = '884156880870572072'; // Suggestions are sent to this channel for staff
+const SUGGESTIONS_CHANNEL_ID = '884156880870572072';
 
 const {
     Client,
@@ -13,115 +12,132 @@ const {
 } = require('discord.js');
 const intents = [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES];
 const client = new Client({ intents });
-
 const db = require('quick.db');
 
-// Button Handler
+// Handle Button Presses
 client.on('interactionCreate', async interaction => {
     if (!interaction.isButton()) return;
-    if (!interaction.member.permissions.has('MANAGE_GUILD')) return;
 
     const fields = interaction.customId.split('_');
-
     if (fields[0] !== 'suggestion') return;
-    const suggestion = db.get(`suggestions_${fields[1]}.${fields[2]}`);
-    const type = fields[3];
 
-    if (type === 'Opinions') {
-        if (suggestion.thread) {
-            interaction.reply({
+    const suggestion = db.get(`suggestions_${fields[1]}.${fields[2]}`);
+    const action = fields[3];
+    const mId = interaction.member.id;
+
+    const updateEmbedWithFeedback = () => {
+        const embed = interaction.message.embeds[0];
+        embed.fields[1].value = `Upvotes: \`${suggestion.upvotes.length}\`\nDownvotes: \`${suggestion.downvotes.length}\``;
+        interaction.update({ embeds: [embed] });
+    };
+
+    if (action === 'upvote') {
+        if (suggestion.upvotes.includes(mId)) {
+            suggestion.upvotes.splice(suggestion.upvotes.indexOf(mId), 1);
+        } else if (suggestion.downvotes.includes(mId)) {
+            suggestion.downvotes.splice(suggestion.downvotes.indexOf(mId), 1);
+            suggestion.upvotes.push(mId);
+        } else suggestion.upvotes.push(mId);
+        db.set(`suggestions_${fields[1]}.${fields[2]}`, suggestion);
+        updateEmbedWithFeedback();
+    }
+
+    if (action === 'downvote') {
+        if (suggestion.downvotes.includes(mId)) {
+            suggestion.downvotes.splice(suggestion.downvotes.indexOf(mId), 1);
+        } else if (suggestion.upvotes.includes(mId)) {
+            suggestion.upvotes.splice(suggestion.upvotes.indexOf(mId), 1);
+            suggestion.downvotes.push(mId);
+        } else suggestion.downvotes.push(mId);
+        db.set(`suggestions_${fields[1]}.${fields[2]}`, suggestion);
+        updateEmbedWithFeedback();
+    } else if (action === 'staff-options') {
+        const userRow = interaction.message.components[0];
+        userRow.spliceComponents(2, 1); // Remove the staff options button
+
+        // New button helper method
+        const btn = (label, style = 'PRIMARY') =>
+            new MessageButton()
+                .setCustomId(
+                    `suggestion_${fields[1]}_${fields[2]}_${label
+                        .replace(/ /g, '-')
+                        .toLowerCase()}`
+                )
+                .setLabel(label)
+                .setStyle(style);
+
+        // Add staff options
+        const staffRow = new MessageActionRow().addComponents([
+            btn('Accept', 'SUCCESS'),
+            btn('Reject', 'DANGER'),
+        ]);
+
+        // Update the message
+        interaction.update({ components: [userRow, staffRow] });
+    } else if (action === 'accept' || action === 'reject') {
+        if (!interaction.member.permissions.has('MANAGE_GUILD')) {
+            return interaction.reply({
+                content: 'You do not have permission to do this!',
                 ephemeral: true,
-                content: 'A thread was already created!',
             });
         }
 
-        // Create thread
-        const embed = new MessageEmbed()
-            .setTitle(`Feedback Requested`)
-            .setColor(0x5865f2)
-            .setDescription(suggestion.content)
-            .setFooter(
-                `Suggested by ${suggestion.author.tag} (${suggestion.author.id})`
-            );
+        const embed = interaction.message.embeds[0];
+        embed.setColor(action === 'accept' ? 0x43b581 : 0xf04747);
+        embed.fields[0].name = `Suggestion ${
+            action === 'accept' ? 'Accepted' : 'Rejected'
+        }`;
 
-        const parent = await interaction.guild.channels.cache
-            .get(SUGGEST_CHANNEL_ID)
-            .send({ embeds: [embed] });
-
-        const thread = await parent.startThread({
-            name: 'Give your opinion on the above suggestion',
-            autoArchiveDuration: 60,
-        });
-
-        return db.set(`suggestions_${fields[1]}.${fields[2]}.thread`, {
-            parent: parent.id,
-            thread: thread.id,
-        });
-    }
-
-    // Remove options
-    const embed = new MessageEmbed()
-        .setTitle(`Suggestion ${type === 'Accept' ? 'Accepted' : 'Denied'}`)
-        .setColor(type === 'Accept' ? 0x43b581 : 0xf04747)
-        .setDescription(suggestion.content)
-        .setFooter(
-            `Suggested by ${suggestion.author.tag} (${suggestion.author.id})`
-        );
-    interaction.message.edit({ embeds: [embed], components: [] });
-
-    // Delete Thread
-    if (suggestion.thread) {
-        try {
-            const parent = await interaction.guild.channels.cache
-                .get(SUGGEST_CHANNEL_ID)
-                .messages.fetch(suggestion.thread.parent);
-            const thread = await interaction.guild.channels.fetch(
-                suggestion.thread.thread
-            );
-            if (parent) parent.delete();
-            if (thread) thread.delete();
-        } catch (e) {}
+        interaction.update({ embeds: [embed], components: [] });
     }
 });
 
-// Message Handler
+// Handle Messages
 client.on('messageCreate', async message => {
     if (message.author.bot) return;
-    if (message.channel.id !== SUGGEST_CHANNEL_ID) return;
+    if (message.channel.id !== SUGGESTIONS_CHANNEL_ID) return;
 
-    // Add to database
+    // Add suggestion to database
     const cb = db.push(`suggestions_${message.author.id}`, {
         status: 'pending',
         content: message.content,
         author: { tag: message.author.tag, id: message.author.id },
+        upvotes: [],
+        downvotes: [],
     });
     const index = cb.length - 1;
 
-    // Create a new embed
+    // Create suggestion embed
     const embed = new MessageEmbed()
-        .setTitle(`New Suggestion`)
         .setColor(0x5865f2)
-        .setDescription(message.content)
-        .setFooter(`Suggested by ${message.author.tag} (${message.author.id})`);
+        .setFooter(message.author.tag, message.author.displayAvatarURL())
+        .addField('Suggestion', message.content)
+        .addField('User Feedback', 'Upvotes: `0`\nDownvotes: `0`');
 
-    // Create buttons
-    const btn = (type, style) =>
+    // New button helper method
+    const btn = (label, style = 'PRIMARY') =>
         new MessageButton()
-            .setCustomId(`suggestion_${message.author.id}_${index}_${type}`)
-            .setLabel(type)
+            .setCustomId(
+                `suggestion_${message.author.id}_${index}_${label
+                    .replace(/ /g, '-')
+                    .toLowerCase()}`
+            )
+            .setLabel(label)
             .setStyle(style);
 
+    // Create buttons
     const row = new MessageActionRow().addComponents([
-        btn('Accept', 'SUCCESS'),
-        btn('Opinions', 'PRIMARY'),
-        btn('Deny', 'DANGER'),
+        btn('Upvote', 'SUCCESS'),
+        btn('Downvote', 'DANGER'),
+        btn('Staff Options'),
     ]);
 
-    // Send staff message
+    // Send embed
     message.guild.channels.cache
         .get(SUGGESTIONS_CHANNEL_ID)
         .send({ embeds: [embed], components: [row] });
 
+    // Delete original message
     message.delete();
 });
 
