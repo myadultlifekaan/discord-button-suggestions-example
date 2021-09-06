@@ -31,6 +31,16 @@ client.on('interactionCreate', async interaction => {
         interaction.update({ embeds: [embed] });
     };
 
+    const btn = (label, style = 'PRIMARY') =>
+        new MessageButton()
+            .setCustomId(
+                `suggestion_${fields[1]}_${fields[2]}_${label
+                    .replace(/ /g, '-')
+                    .toLowerCase()}`
+            )
+            .setLabel(label)
+            .setStyle(style);
+
     if (action === 'upvote') {
         if (suggestion.upvotes.includes(mId)) {
             suggestion.upvotes.splice(suggestion.upvotes.indexOf(mId), 1);
@@ -55,37 +65,26 @@ client.on('interactionCreate', async interaction => {
         const userRow = interaction.message.components[0];
         userRow.spliceComponents(2, 1); // Remove the staff options button
 
-        // New button helper method
-        const btn = (label, style = 'PRIMARY') =>
-            new MessageButton()
-                .setCustomId(
-                    `suggestion_${fields[1]}_${fields[2]}_${label
-                        .replace(/ /g, '-')
-                        .toLowerCase()}`
-                )
-                .setLabel(label)
-                .setStyle(style);
-
         // Add staff options
         const staffRow = new MessageActionRow().addComponents([
             btn('Accept', 'SUCCESS'),
-            btn('Create Thread'),
+            ...(suggestion.thread ? [] : [btn('Create Thread')]),
             btn('Reject', 'DANGER'),
         ]);
 
         // Update the message
         interaction.update({ components: [userRow, staffRow] });
     } else if (action === 'create-thread') {
-        const staffRow = interaction.message.components[1];
-        staffRow.spliceComponents(1, 1); // Remove the create thread button
-
         const thread = await interaction.message.startThread({
             name: 'Give your opinions on the above suggestion',
             autoArchiveDuration: 60,
         });
 
+        const userRow = interaction.message.components[0];
+        userRow.addComponents([btn('Staff Options')]);
+
         interaction.update({
-            components: [interaction.message.components[0], staffRow],
+            components: [userRow],
         });
 
         db.set(`suggestions_${fields[1]}.${fields[2]}.thread`, thread.id);
