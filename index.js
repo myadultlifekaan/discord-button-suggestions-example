@@ -75,6 +75,13 @@ client.on('interactionCreate', async interaction => {
         // Update the message
         interaction.update({ components: [userRow, staffRow] });
     } else if (action === 'create-thread') {
+        if (!interaction.member.permissions.has('MANAGE_GUILD')) {
+            return interaction.reply({
+                content: 'You do not have permission to do this!',
+                ephemeral: true,
+            });
+        }
+
         const thread = await interaction.message.startThread({
             name: 'Give your opinions on the above suggestion',
             autoArchiveDuration: 60,
