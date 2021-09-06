@@ -2,4 +2,4 @@
 
 # discord-button-suggestions-example
 
-![](https://i.imgur.com/aqf4xNh.gif)
+![](https://i.imgur.com/02kc0kR.gif)
