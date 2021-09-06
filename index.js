@@ -69,17 +69,39 @@ client.on('interactionCreate', async interaction => {
         // Add staff options
         const staffRow = new MessageActionRow().addComponents([
             btn('Accept', 'SUCCESS'),
+            btn('Create Thread'),
             btn('Reject', 'DANGER'),
         ]);
 
         // Update the message
         interaction.update({ components: [userRow, staffRow] });
+    } else if (action === 'create-thread') {
+        const staffRow = interaction.message.components[1];
+        staffRow.spliceComponents(1, 1); // Remove the create thread button
+
+        const thread = await interaction.message.startThread({
+            name: 'Give your opinions on the above suggestion',
+            autoArchiveDuration: 60,
+        });
+
+        interaction.update({
+            components: [interaction.message.components[0], staffRow],
+        });
+
+        db.set(`suggestions_${fields[1]}.${fields[2]}.thread`, thread.id);
     } else if (action === 'accept' || action === 'reject') {
         if (!interaction.member.permissions.has('MANAGE_GUILD')) {
             return interaction.reply({
                 content: 'You do not have permission to do this!',
                 ephemeral: true,
             });
+        }
+
+        if (suggestion.thread) {
+            const thread = await interaction.guild.channels.fetch(
+                suggestion.thread
+            );
+            if (thread) thread.delete();
         }
 
         const embed = interaction.message.embeds[0];
