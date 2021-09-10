@@ -70,10 +70,26 @@ client.on('interactionCreate', async interaction => {
             btn('Accept', 'SUCCESS'),
             ...(suggestion.thread ? [] : [btn('Create Thread')]),
             btn('Reject', 'DANGER'),
+            btn('Cancel', 'SECONDARY'),
         ]);
 
         // Update the message
         interaction.update({ components: [userRow, staffRow] });
+    } else if (action === 'cancel') {
+        if (!interaction.member.permissions.has('MANAGE_GUILD')) {
+            return interaction.reply({
+                content: 'You do not have permission to do this!',
+                ephemeral: true,
+            });
+        }
+
+        const userRow = interaction.message.components[0];
+
+        userRow.addComponents([btn('Staff Options')]);
+
+        interaction.update({
+            components: [userRow],
+        });
     } else if (action === 'create-thread') {
         if (!interaction.member.permissions.has('MANAGE_GUILD')) {
             return interaction.reply({
