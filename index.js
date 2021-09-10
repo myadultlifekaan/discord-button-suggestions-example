@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 // Configuration
-const SUGGESTIONS_CHANNEL_ID = '343572980351107077';
+const SUGGESTIONS_CHANNEL_ID = '886001921712877578';
 
 const {
     Client,
