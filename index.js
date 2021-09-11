@@ -27,7 +27,7 @@ client.on('interactionCreate', async interaction => {
 
     const updateEmbedWithFeedback = () => {
         const embed = interaction.message.embeds[0];
-        embed.fields[1].value = `Upvotes: \`${suggestion.upvotes.length}\`\nDownvotes: \`${suggestion.downvotes.length}\``;
+        embed.fields[0].value = `Upvotes: \`${suggestion.upvotes.length}\`\nDownvotes: \`${suggestion.downvotes.length}\``;
         interaction.update({ embeds: [embed] });
     };
 
