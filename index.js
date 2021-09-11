@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-const SUGGESTIONS_CHANNEL_ID = '884156880870572072';
+const SUGGESTIONS_CHANNEL_ID = '886001921712877578';
 
 import {
     Client,
