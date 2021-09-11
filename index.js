@@ -1,117 +1,77 @@
-require('dotenv').config();
+import dotenv from 'dotenv';
+dotenv.config();
 
-// Configuration
-const SUGGESTIONS_CHANNEL_ID = '886001921712877578';
+const SUGGESTIONS_CHANNEL_ID = '884156880870572072';
 
-const {
+import {
     Client,
+    Collection,
     Intents,
     MessageEmbed,
     MessageButton,
     MessageActionRow,
-} = require('discord.js');
+} from 'discord.js';
+import { globby } from 'globby';
+import db from 'quick.db';
+
 const intents = [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES];
 const client = new Client({ intents });
-const db = require('quick.db');
 
-// Handle Button Presses
+client.buttons = new Collection();
+
+client.once('ready', async () => {
+    console.log('Ready!');
+
+    const buttons = await globby('Buttons');
+    const categories = buttons
+        .map(i => i.split('/')[1])
+        .filter((v, i, a) => a.indexOf(v) === i);
+
+    for (let i = 0; i < categories.length; i++) {
+        const files = buttons.filter(f => f.split('/')[1] === categories[i]);
+        client.buttons.set(categories[i], files);
+    }
+});
+
 client.on('interactionCreate', async interaction => {
     if (!interaction.isButton()) return;
 
     const fields = interaction.customId.split('_');
-    if (fields[0] !== 'suggestion') return;
 
-    const suggestion = db.get(`suggestions_${fields[1]}.${fields[2]}`);
-    const action = fields[3];
-    const mId = interaction.member.id;
+    const commands = client.buttons.get(fields[0]);
+    if (!commands) return console.log('Button category not found');
 
-    const updateEmbedWithFeedback = () => {
-        const embed = interaction.message.embeds[0];
-        embed.fields[0].value = `Upvotes: \`${suggestion.upvotes.length}\`\nDownvotes: \`${suggestion.downvotes.length}\``;
-        interaction.update({ embeds: [embed] });
-    };
+    const path = commands.find(f => f.split('/')[2] === `${fields[3]}.js`);
+    if (!path) return console.log('Button path not found');
 
-    const btn = (label, style = 'PRIMARY') =>
-        new MessageButton()
-            .setCustomId(
-                `suggestion_${fields[1]}_${fields[2]}_${label
-                    .replace(/ /g, '-')
-                    .toLowerCase()}`
-            )
-            .setLabel(label)
-            .setStyle(style);
+    const args = {};
 
-    if (action === 'upvote') {
-        if (suggestion.upvotes.includes(mId)) {
-            suggestion.upvotes.splice(suggestion.upvotes.indexOf(mId), 1);
-        } else if (suggestion.downvotes.includes(mId)) {
-            suggestion.downvotes.splice(suggestion.downvotes.indexOf(mId), 1);
-            suggestion.upvotes.push(mId);
-        } else suggestion.upvotes.push(mId);
-        db.set(`suggestions_${fields[1]}.${fields[2]}`, suggestion);
-        updateEmbedWithFeedback();
+    if (fields[0] === 'suggestion') {
+        args.suggestionPath = `suggestions_${fields[1]}.${fields[2]}`;
+        args.suggestion = db.get(args.suggestionPath);
+        args.btn = (label, style = 'PRIMARY') =>
+            new MessageButton()
+                .setCustomId(
+                    `suggestion_${fields[1]}_${fields[2]}_${label
+                        .replace(/ /g, '-')
+                        .toLowerCase()}`
+                )
+                .setLabel(label)
+                .setStyle(style);
     }
 
-    if (action === 'downvote') {
-        if (suggestion.downvotes.includes(mId)) {
-            suggestion.downvotes.splice(suggestion.downvotes.indexOf(mId), 1);
-        } else if (suggestion.upvotes.includes(mId)) {
-            suggestion.upvotes.splice(suggestion.upvotes.indexOf(mId), 1);
-            suggestion.downvotes.push(mId);
-        } else suggestion.downvotes.push(mId);
-        db.set(`suggestions_${fields[1]}.${fields[2]}`, suggestion);
-        updateEmbedWithFeedback();
-    } else if (action === 'staff-options') {
-        const userRow = interaction.message.components[0];
-        userRow.spliceComponents(2, 1); // Remove the staff options button
+    const file = await import(`./${path}`);
 
-        // Add staff options
-        const staffRow = new MessageActionRow().addComponents([
-            btn('Accept', 'SUCCESS'),
-            btn('Reject', 'DANGER'),
-            btn('Cancel', 'SECONDARY'),
-        ]);
-
-        // Update the message
-        interaction.update({ components: [userRow, staffRow] });
-    } else if (action === 'cancel') {
+    if (file?.options?.staffOnly) {
         if (!interaction.member.permissions.has('MANAGE_GUILD')) {
             return interaction.reply({
                 content: 'You do not have permission to do this!',
                 ephemeral: true,
             });
         }
-
-        const userRow = interaction.message.components[0];
-
-        userRow.addComponents([btn('Staff Options')]);
-
-        interaction.update({
-            components: [userRow],
-        });
-    } else if (action === 'accept' || action === 'reject') {
-        if (!interaction.member.permissions.has('MANAGE_GUILD')) {
-            return interaction.reply({
-                content: 'You do not have permission to do this!',
-                ephemeral: true,
-            });
-        }
-
-        if (suggestion.thread) {
-            const thread = await interaction.guild.channels.fetch(
-                suggestion.thread
-            );
-            if (thread) thread.delete();
-        }
-
-        const embed = interaction.message.embeds[0];
-        embed.setColor(action === 'accept' ? 0x43b581 : 0xf04747);
-        embed.fields[0].name = `Suggestion ${
-            action === 'accept' ? 'Accepted' : 'Rejected'
-        }`;
-
-        interaction.update({ embeds: [embed], components: [] });
     }
+
+    file.run(client, interaction, args);
 });
 
 // Handle Messages
@@ -170,10 +130,6 @@ client.on('messageCreate', async message => {
 
     // Delete original message
     message.delete();
-});
-
-client.on('ready', () => {
-    console.log(`Logged in as ${client.user.tag}`);
 });
 
 client.login(process.env.TOKEN);
