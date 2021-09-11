@@ -166,7 +166,7 @@ client.on('messageCreate', async message => {
         autoArchiveDuration: 'MAX',
     });
 
-    db.set(`suggestions_${fields[1]}.${fields[2]}.thread`, thread.id);
+    db.set(`suggestions_${message.author.id}.${index}.thread`, thread.id);
 
     // Delete original message
     message.delete();
