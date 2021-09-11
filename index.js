@@ -68,7 +68,6 @@ client.on('interactionCreate', async interaction => {
         // Add staff options
         const staffRow = new MessageActionRow().addComponents([
             btn('Accept', 'SUCCESS'),
-            ...(suggestion.thread ? [] : [btn('Create Thread')]),
             btn('Reject', 'DANGER'),
             btn('Cancel', 'SECONDARY'),
         ]);
@@ -90,27 +89,6 @@ client.on('interactionCreate', async interaction => {
         interaction.update({
             components: [userRow],
         });
-    } else if (action === 'create-thread') {
-        if (!interaction.member.permissions.has('MANAGE_GUILD')) {
-            return interaction.reply({
-                content: 'You do not have permission to do this!',
-                ephemeral: true,
-            });
-        }
-
-        const thread = await interaction.message.startThread({
-            name: 'Give your opinions on the above suggestion',
-            autoArchiveDuration: 60,
-        });
-
-        const userRow = interaction.message.components[0];
-        userRow.addComponents([btn('Staff Options')]);
-
-        interaction.update({
-            components: [userRow],
-        });
-
-        db.set(`suggestions_${fields[1]}.${fields[2]}.thread`, thread.id);
     } else if (action === 'accept' || action === 'reject') {
         if (!interaction.member.permissions.has('MANAGE_GUILD')) {
             return interaction.reply({
@@ -178,9 +156,17 @@ client.on('messageCreate', async message => {
     ]);
 
     // Send embed
-    message.guild.channels.cache
+    const msg = await message.guild.channels.cache
         .get(SUGGESTIONS_CHANNEL_ID)
         .send({ embeds: [embed], components: [row] });
+
+    // Create thread
+    const thread = await msg.startThread({
+        name: 'Discussion',
+        autoArchiveDuration: 'MAX',
+    });
+
+    db.set(`suggestions_${fields[1]}.${fields[2]}.thread`, thread.id);
 
     // Delete original message
     message.delete();
