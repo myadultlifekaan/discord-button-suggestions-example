@@ -155,7 +155,8 @@ client.on('messageCreate', async message => {
     const embed = new MessageEmbed()
         .setColor(0x5865f2)
         .setFooter(message.author.tag, message.author.displayAvatarURL())
-        .addField('Suggestion', message.content)
+        .setDescription(message.content)
+        .setTitle('Suggestion')
         .addField('User Feedback', 'Upvotes: `0`\nDownvotes: `0`');
 
     // New button helper method
