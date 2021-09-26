@@ -63,7 +63,7 @@ client.on('interactionCreate', async interaction => {
     const file = await import(`./${path}`);
 
     if (file?.options?.staffOnly) {
-        if (!interaction.member.permissions.has('MANAGE_GUILD')) {
+        if (!interaction.member.permissions.has('MANAGE_MESSAGES')) {
             return interaction.reply({
                 content: 'You do not have permission to do this!',
                 ephemeral: true,
